@@ -38,4 +38,11 @@ abstract class ProxyManagerPlatform extends PlatformInterface {
   Future<void> cleanSystemProxy() async {
     throw UnimplementedError('cleanSystemProxy() has not been implemented.');
   }
+
+  /// get system proxy enable
+  Future<bool> getSystemProxyEnable(
+      ProxyTypes types, String url, int port) async {
+    throw UnimplementedError(
+        'getSystemProxyEnable() has not been implemented.');
+  }
 }

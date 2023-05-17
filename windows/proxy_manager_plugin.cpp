@@ -23,7 +23,19 @@
 #include <sstream>
 
 // Big Thanks to Qv2ray opensource project
+std::wstring encodeableMapToString(const flutter::EncodableMap* args){
+    auto type = std::get<std::string>(args->at(flutter::EncodableValue("type")));
+    auto url = std::get<std::string>(args->at(flutter::EncodableValue("url")));
 
+    if (type == "http" || type == "https") {
+        url = "http://" + url;
+    }
+    else if (type == "socks") {
+        url = "socks5://" + url;
+    }
+    auto wurl = std::wstring(url.begin(), url.end());
+    return wurl;
+}
 void setSystemProxy(const flutter::EncodableMap* args) {
     INTERNET_PER_CONN_OPTION_LIST list;
     DWORD dwBufSize = sizeof(list);
@@ -41,7 +53,7 @@ void setSystemProxy(const flutter::EncodableMap* args) {
     else if (type == "socks") {
         url = "socks5://" + url;
     }
-    auto wurl = std::wstring(url.begin(), url.end());
+    auto wurl = encodeableMapToString(args);
     auto proxy_full_addr = new WCHAR[url.length() + 1];
     wcscpy_s(proxy_full_addr, url.length() + 1, wurl.c_str());
 
@@ -102,6 +114,34 @@ void setSystemProxy(const flutter::EncodableMap* args) {
     InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
 }
 
+bool getSystemProxyEnable(const flutter::EncodableMap* args) {
+    auto wurl = encodeableMapToString(args);
+
+    INTERNET_PER_CONN_OPTION_LIST list;
+    INTERNET_PER_CONN_OPTION option[2];
+    unsigned long nSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+    option[0].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+    option[1].dwOption = INTERNET_PER_CONN_FLAGS;
+  
+    list.dwSize = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+    list.pszConnection = NULL;
+    list.dwOptionCount = 2;
+    list.dwOptionError = 0;
+    list.pOptions = option;
+
+    if(!InternetQueryOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, &nSize)){
+        return false;
+    }
+    if (option[0].Value.pszValue != NULL){
+        if(wurl != option[0].Value.pszValue){
+            return false;
+        }
+        GlobalFree(option[0].Value.pszValue);
+    }
+    
+    bool enable = option[1].Value.dwValue & PROXY_TYPE_PROXY;
+    return enable;
+}
 void cleanSystemProxy() {
     INTERNET_PER_CONN_OPTION_LIST list;
     DWORD dwBufSize = sizeof(list);
@@ -208,7 +248,12 @@ void ProxyManagerPlugin::HandleMethodCall(
       setSystemProxy(arguments);
       result->Success();
   }
-   else {
+  else if (method_call.method_name().compare("getSystemProxyEnable") == 0){
+      auto* arguments = std::get_if<flutter::EncodableMap>(method_call.arguments());
+      bool enable = getSystemProxyEnable(arguments);
+      result->Success(flutter::EncodableValue(enable ? "true" : "false"));
+  }
+  else {
     result->NotImplemented();
   }
 }

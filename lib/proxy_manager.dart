@@ -184,4 +184,35 @@ class ProxyManager {
       print('cmd: $cmd returns ${res.exitCode}');
     }
   }
+
+  Future<bool> getSystemProxyEnable(
+      ProxyTypes types, String url, int port) async {
+    switch (Platform.operatingSystem) {
+      case "windows":
+        return await _getSystemProxyEnableWindows(types, url, port);
+      case "linux":
+        return await _getSystemProxyEnableLinux(types, url, port);
+      case "macos":
+        return await _getSystemProxyEnableMacos(types, url, port);
+    }
+    return false;
+  }
+
+  Future<bool> _getSystemProxyEnableWindows(
+      ProxyTypes types, String url, int port) async {
+    return await ProxyManagerPlatform.instance
+        .getSystemProxyEnable(types, url, port);
+  }
+
+  Future<bool> _getSystemProxyEnableLinux(
+      ProxyTypes types, String url, int port) async {
+    throw UnimplementedError(
+        '_getSystemProxyEnableLinux() has not been implemented.');
+  }
+
+  Future<bool> _getSystemProxyEnableMacos(
+      ProxyTypes types, String url, int port) async {
+    throw UnimplementedError(
+        '_getSystemProxyEnableMacos() has not been implemented.');
+  }
 }

@@ -29,4 +29,11 @@ class MethodChannelProxyManager extends ProxyManagerPlatform {
   Future<void> cleanSystemProxy() async {
     await methodChannel.invokeMethod('cleanSystemProxy');
   }
+
+  @override
+  Future<bool> getSystemProxyEnable(
+      ProxyTypes types, String url, int port) async {
+    String ret = await methodChannel.invokeMethod('getSystemProxyEnable');
+    return ret == "true";
+  }
 }

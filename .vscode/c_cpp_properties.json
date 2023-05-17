@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "windows",
+            "includePath": [
+                "D:\\flutter_windows_3.7.7-stable\\flutter\\bin\\cache\\artifacts\\engine\\windows-x64\\cpp_client_wrapper\\include"
+            ],
+            "intelliSenseMode": "windows-msvc-x64",
+            "compilerPath": "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\VC\\Tools\\MSVC\\14.16.27023\\bin\\Hostx64\\x64\\cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17"
+        }
+    ],
+    "version": 4
+}
