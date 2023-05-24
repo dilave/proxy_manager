@@ -20,9 +20,9 @@ class MethodChannelProxyManager extends ProxyManagerPlatform {
   }
 
   @override
-  Future<void> setSystemProxy(ProxyTypes type, String url, int port) async {
-    await methodChannel.invokeMethod('setSystemProxy',
-        <String, dynamic>{"type": type.name, "url": "$url:$port"});
+  Future<void> setSystemProxy(String proxy) async {
+    await methodChannel
+        .invokeMethod('setSystemProxy', <String, dynamic>{"proxy": proxy});
   }
 
   @override
@@ -31,10 +31,9 @@ class MethodChannelProxyManager extends ProxyManagerPlatform {
   }
 
   @override
-  Future<bool> getSystemProxyEnable(
-      ProxyTypes type, String url, int port) async {
-    String ret = await methodChannel.invokeMethod('getSystemProxyEnable',
-        <String, dynamic>{"type": type.name, "url": "$url:$port"});
+  Future<bool> getSystemProxyEnable(String proxy) async {
+    String ret = await methodChannel.invokeMethod(
+        'getSystemProxyEnable', <String, dynamic>{"proxy": proxy});
     return ret == "true";
   }
 }

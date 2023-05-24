@@ -8,27 +8,130 @@
 import 'dart:io';
 
 import 'proxy_manager_platform_interface.dart';
+import 'dart:ffi';
 import 'package:path/path.dart' as path;
+import 'package:ffi/ffi.dart';
+import 'package:win32/win32.dart';
 
 enum ProxyTypes { http, https, socks }
 
-class ProxyManager {
-  /// get platform version
-  Future<String?> getPlatformVersion() {
-    return ProxyManagerPlatform.instance.getPlatformVersion();
+const regSubKey =
+    r'SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings';
+const ProxyServer = r'ProxyServer';
+const ProxyEnable = r'ProxyEnable';
+
+Object? getRegistryValue(
+  int hKeyValue,
+  String subKey,
+  String valueName,
+) {
+  late Object? dataValue;
+
+  final subKeyPtr = subKey.toNativeUtf16();
+  final valueNamePtr = valueName.toNativeUtf16();
+  final openKeyPtr = calloc<HANDLE>();
+  final dataType = calloc<DWORD>();
+
+  final data = calloc<BYTE>(512);
+  final dataSize = calloc<DWORD>()..value = 512;
+
+  try {
+    var result = RegOpenKeyEx(hKeyValue, subKeyPtr, 0, KEY_READ, openKeyPtr);
+    if (result == ERROR_SUCCESS) {
+      result = RegQueryValueEx(
+          openKeyPtr.value, valueNamePtr, nullptr, dataType, data, dataSize);
+
+      if (result == ERROR_SUCCESS) {
+        if (dataType.value == REG_DWORD) {
+          dataValue = data.value;
+        } else if (dataType.value == REG_SZ) {
+          dataValue = data.cast<Utf16>().toDartString();
+        } else {}
+      } else {
+        //(HRESULT_FROM_WIN32(result));
+      }
+    } else {
+      //(HRESULT_FROM_WIN32(result));
+    }
+  } finally {
+    RegCloseKey(openKeyPtr.value);
+    free(subKeyPtr);
+    free(valueNamePtr);
+    free(openKeyPtr);
+    free(data);
+    free(dataSize);
   }
 
+  return dataValue;
+}
+
+bool setRegistryStringValue(
+    int hKeyValue, String regPath, String valueName, String value) {
+  final phKey = calloc<HANDLE>();
+  final lpKeyPath = regPath.toNativeUtf16();
+  final lpValueName = valueName.toNativeUtf16();
+  final lpValue = value.toNativeUtf16();
+
+  try {
+    var result = RegSetKeyValue(
+        hKeyValue, lpKeyPath, lpValueName, REG_SZ, lpValue, lpValue.length * 2);
+    if (result == ERROR_SUCCESS) {
+      return true;
+    }
+  } finally {
+    RegCloseKey(phKey.value);
+    free(phKey);
+    free(lpKeyPath);
+    free(lpValueName);
+    free(lpValue);
+  }
+  return false;
+}
+
+bool setRegistryIntValue(
+    int hKeyValue, String regPath, String valueName, int value) {
+  final phKey = calloc<HANDLE>();
+  final lpKeyPath = regPath.toNativeUtf16();
+  final lpValueName = valueName.toNativeUtf16();
+  final data = calloc<DWORD>()..value = value;
+
+  try {
+    var result =
+        RegSetKeyValue(hKeyValue, lpKeyPath, lpValueName, REG_DWORD, data, 4);
+
+    if (result == ERROR_SUCCESS) {
+      return true;
+    }
+  } finally {
+    free(phKey);
+    free(lpKeyPath);
+    free(lpValueName);
+  }
+  return false;
+}
+
+class ProxyOption {
+  ProxyTypes type;
+  String url;
+  int port;
+  ProxyOption(this.type, this.url, this.port);
+}
+
+class ProxyManager {
   /// set system proxy
-  Future<void> setAsSystemProxy(ProxyTypes types, String url, int port) async {
+  Future<void> setAsSystemProxy(List<ProxyOption> options) async {
+    if (options.isEmpty) {
+      return;
+    }
     switch (Platform.operatingSystem) {
       case "windows":
-        await _setAsSystemProxyWindows(types, url, port);
+        await _setAsSystemProxyBatWindows(options);
         break;
       case "linux":
-        _setAsSystemProxyLinux(types, url, port);
+        _setAsSystemProxyBatLinux(options);
         break;
       case "macos":
-        await _setAsSystemProxyMacos(types, url, port);
+        await _setAsSystemProxyBatMacos(options);
         break;
     }
   }
@@ -39,6 +142,12 @@ class ProxyManager {
     final lines = resp.stdout.toString().split("\n");
     lines.removeWhere((element) => element.contains("*"));
     return lines;
+  }
+
+  Future<void> _setAsSystemProxyBatMacos(List<ProxyOption> options) async {
+    for (var opt in options) {
+      _setAsSystemProxyMacos(opt.type, opt.url, opt.port);
+    }
   }
 
   Future<void> _setAsSystemProxyMacos(
@@ -84,31 +193,60 @@ class ProxyManager {
     }
   }
 
-  Future<void> _setAsSystemProxyWindows(
-      ProxyTypes types, String url, int port) async {
-    ProxyManagerPlatform.instance.setSystemProxy(types, url, port);
+  String _getProxyWindows(List<ProxyOption> options) {
+    String proxy = "";
+    for (var opt in options) {
+      if (opt.type == ProxyTypes.http) {
+        proxy = proxy + "http://${opt.url}:${opt.port};";
+      } else if (opt.type == ProxyTypes.https) {
+        proxy = proxy + "https://${opt.url}:${opt.port};";
+      } else if (opt.type == ProxyTypes.socks) {
+        //windows socks proxy must set by registry
+        proxy = proxy + "socks5://${opt.url}:${opt.port};";
+      } else {
+        continue;
+      }
+    }
+    return proxy;
   }
 
-  void _setAsSystemProxyLinux(ProxyTypes types, String url, int port) {
+  Future<void> _setAsSystemProxyBatWindows(List<ProxyOption> options) async {
+    String proxy = _getProxyWindows(options);
+    if (proxy.isEmpty) {
+      return;
+    }
+
+    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, proxy);
+    setRegistryIntValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable, 1);
+  }
+
+  void _setAsSystemProxyBatLinux(List<ProxyOption> options) {
+    for (var opt in options) {
+      _setAsSystemProxyLinux(opt.type, opt.url, opt.port);
+    }
+  }
+
+  void _setAsSystemProxyLinux(ProxyTypes type, String url, int port) {
     final homeDir = Platform.environment['HOME']!;
     final configDir = path.join(homeDir, ".config");
     final cmdList = List<List<String>>.empty(growable: true);
     final desktop = Platform.environment['XDG_CURRENT_DESKTOP'];
     final isKDE = desktop == "KDE";
+
     // gsetting
     cmdList
         .add(["gsettings", "set", "org.gnome.system.proxy", "mode", "manual"]);
     cmdList.add([
       "gsettings",
       "set",
-      "org.gnome.system.proxy.${types.name}",
+      "org.gnome.system.proxy.${type.name}",
       "host",
       "$url"
     ]);
     cmdList.add([
       "gsettings",
       "set",
-      "org.gnome.system.proxy.${types.name}",
+      "org.gnome.system.proxy.${type.name}",
       "port",
       "$port"
     ]);
@@ -131,8 +269,8 @@ class ProxyManager {
         "--group",
         "Proxy Settings",
         "--key",
-        "${types.name}Proxy",
-        "${types.name}://$url:$port"
+        "${type.name}Proxy",
+        "${type.name}://$url:$port"
       ]);
     }
     for (final cmd in cmdList) {
@@ -156,7 +294,7 @@ class ProxyManager {
   }
 
   Future<void> _cleanSystemProxyWindows() async {
-    await ProxyManagerPlatform.instance.cleanSystemProxy();
+    setRegistryIntValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable, 0);
   }
 
   void _cleanSystemProxyLinux() {
@@ -185,33 +323,44 @@ class ProxyManager {
     }
   }
 
-  Future<bool> getSystemProxyEnable(
-      ProxyTypes type, String url, int port) async {
+  Future<bool> getSystemProxyEnable(List<ProxyOption> options) async {
+    if (options.isEmpty) {
+      return false;
+    }
     switch (Platform.operatingSystem) {
       case "windows":
-        return await _getSystemProxyEnableWindows(type, url, port);
+        return await _getSystemProxyEnableWindows(options);
       case "linux":
-        return await _getSystemProxyEnableLinux(type, url, port);
+        return await _getSystemProxyEnableLinux(options);
       case "macos":
-        return await _getSystemProxyEnableMacos(type, url, port);
+        return await _getSystemProxyEnableMacos(options);
     }
     return false;
   }
 
-  Future<bool> _getSystemProxyEnableWindows(
-      ProxyTypes type, String url, int port) async {
-    return await ProxyManagerPlatform.instance
-        .getSystemProxyEnable(type, url, port);
+  Future<bool> _getSystemProxyEnableWindows(List<ProxyOption> options) async {
+    String proxy = _getProxyWindows(options);
+    if (proxy.isEmpty) {
+      return false;
+    }
+    Object? serverObject =
+        getRegistryValue(HKEY_CURRENT_USER, regSubKey, ProxyServer);
+    Object? enableObject =
+        getRegistryValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable);
+    if (serverObject == null || enableObject == null) {
+      return false;
+    }
+    String server = serverObject as String;
+    int enable = enableObject as int;
+    return server == proxy && (enable == 1);
   }
 
-  Future<bool> _getSystemProxyEnableLinux(
-      ProxyTypes type, String url, int port) async {
+  Future<bool> _getSystemProxyEnableLinux(List<ProxyOption> options) async {
     throw UnimplementedError(
         '_getSystemProxyEnableLinux() has not been implemented.');
   }
 
-  Future<bool> _getSystemProxyEnableMacos(
-      ProxyTypes type, String url, int port) async {
+  Future<bool> _getSystemProxyEnableMacos(List<ProxyOption> options) async {
     throw UnimplementedError(
         '_getSystemProxyEnableMacos() has not been implemented.');
   }

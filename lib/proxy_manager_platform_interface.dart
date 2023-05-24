@@ -30,7 +30,7 @@ abstract class ProxyManagerPlatform extends PlatformInterface {
   }
 
   /// set system proxy base
-  Future<void> setSystemProxy(ProxyTypes types, String url, int port) async {
+  Future<void> setSystemProxy(String proxy) async {
     throw UnimplementedError('setSystemProxy() has not been implemented.');
   }
 
@@ -40,8 +40,7 @@ abstract class ProxyManagerPlatform extends PlatformInterface {
   }
 
   /// get system proxy enable
-  Future<bool> getSystemProxyEnable(
-      ProxyTypes type, String url, int port) async {
+  Future<bool> getSystemProxyEnable(String proxy) async {
     throw UnimplementedError(
         'getSystemProxyEnable() has not been implemented.');
   }
