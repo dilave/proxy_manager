@@ -28,7 +28,7 @@ Object? getRegistryValue(
   String subKey,
   String valueName,
 ) {
-  late Object? dataValue;
+  Object? dataValue;
 
   final subKeyPtr = subKey.toNativeUtf16();
   final valueNamePtr = valueName.toNativeUtf16();
@@ -299,7 +299,9 @@ class ProxyManager {
   }
 
   Future<void> _cleanSystemProxyWindows() async {
+    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, "");
     setRegistryIntValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable, 0);
+    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyOverride, "");
   }
 
   void _cleanSystemProxyLinux() {
