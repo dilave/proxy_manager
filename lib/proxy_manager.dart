@@ -121,6 +121,8 @@ class ProxyOption {
 }
 
 class ProxyManager {
+  bool _proxySet = false; //暂时没有找到可以直接从系统获取状态的方法，先用内部状态处理
+
   /// set system proxy
   Future<void> setAsSystemProxy(List<ProxyOption> options) async {
     if (options.isEmpty) {
@@ -155,6 +157,7 @@ class ProxyManager {
 
   Future<void> _setAsSystemProxyMacos(
       ProxyTypes type, String url, int port) async {
+    _proxySet = true;
     final devices = await _getNetworkDeviceListMacos();
     for (final dev in devices) {
       switch (type) {
@@ -181,6 +184,7 @@ class ProxyManager {
   }
 
   Future<void> _cleanSystemProxyMacos() async {
+    _proxySet = false;
     final devices = await _getNetworkDeviceListMacos();
     for (final dev in devices) {
       await Future.wait([
@@ -232,6 +236,7 @@ class ProxyManager {
   }
 
   void _setAsSystemProxyLinux(ProxyTypes type, String url, int port) {
+    _proxySet = true;
     final homeDir = Platform.environment['HOME']!;
     final configDir = path.join(homeDir, ".config");
     final cmdList = List<List<String>>.empty(growable: true);
@@ -305,6 +310,7 @@ class ProxyManager {
   }
 
   void _cleanSystemProxyLinux() {
+    _proxySet = false;
     final homeDir = Platform.environment['HOME']!;
     final configDir = path.join(homeDir, ".config/");
     final cmdList = List<List<String>>.empty(growable: true);
@@ -363,12 +369,10 @@ class ProxyManager {
   }
 
   Future<bool> _getSystemProxyEnableLinux(List<ProxyOption> options) async {
-    throw UnimplementedError(
-        '_getSystemProxyEnableLinux() has not been implemented.');
+    return _proxySet;
   }
 
   Future<bool> _getSystemProxyEnableMacos(List<ProxyOption> options) async {
-    throw UnimplementedError(
-        '_getSystemProxyEnableMacos() has not been implemented.');
+    return _proxySet;
   }
 }
