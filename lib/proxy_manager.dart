@@ -121,7 +121,13 @@ class ProxyOption {
 }
 
 class ProxyManager {
-  bool _proxySet = false; //暂时没有找到可以直接从系统获取状态的方法，先用内部状态处理
+  static Set<String> _excludeDevices = {};
+  static bool _proxySet = false; //暂时没有找到可以直接从系统获取状态的方法，先用内部状态处理
+
+  /// ExcludeDevices for macos
+  void setExcludeDevices(Set<String> devices) {
+    _excludeDevices = devices;
+  }
 
   /// set system proxy
   Future<void> setAsSystemProxy(List<ProxyOption> options) async {
@@ -145,7 +151,10 @@ class ProxyManager {
     final resp = await Process.run(
         "/usr/sbin/networksetup", ["-listallnetworkservices"]);
     final lines = resp.stdout.toString().split("\n");
-    lines.removeWhere((element) => element.contains("*"));
+    lines.removeWhere((element) =>
+        element.isEmpty ||
+        element.contains("*") ||
+        _excludeDevices.contains(element));
     return lines;
   }
 
