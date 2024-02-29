@@ -11,7 +11,7 @@ import 'proxy_manager_platform_interface.dart';
 import 'dart:ffi';
 import 'package:path/path.dart' as path;
 import 'package:ffi/ffi.dart';
-import 'package:win32/win32.dart';
+/*import 'package:win32/win32.dart';
 
 enum ProxyTypes { http, https, socks }
 
@@ -112,6 +112,7 @@ bool setRegistryIntValue(
   }
   return false;
 }
+*/
 
 class ProxyOption {
   ProxyTypes type;
@@ -231,11 +232,11 @@ class ProxyManager {
     if (proxy.isEmpty) {
       return;
     }
-
-    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, proxy);
+    ProxyManagerPlatform.instance.setSystemProxy(proxy);
+    /*setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, proxy);
     setRegistryIntValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable, 1);
     setRegistryStringValue(
-        HKEY_CURRENT_USER, regSubKey, ProxyOverride, ProxyOverrideValue);
+        HKEY_CURRENT_USER, regSubKey, ProxyOverride, ProxyOverrideValue);*/
   }
 
   void _setAsSystemProxyBatLinux(List<ProxyOption> options) {
@@ -313,9 +314,10 @@ class ProxyManager {
   }
 
   Future<void> _cleanSystemProxyWindows() async {
-    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, "");
+    await ProxyManagerPlatform.instance.cleanSystemProxy();
+    /*setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyServer, "");
     setRegistryIntValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable, 0);
-    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyOverride, "");
+    setRegistryStringValue(HKEY_CURRENT_USER, regSubKey, ProxyOverride, "");*/
   }
 
   void _cleanSystemProxyLinux() {
@@ -365,7 +367,8 @@ class ProxyManager {
     if (proxy.isEmpty) {
       return false;
     }
-    Object? serverObject =
+    return await await ProxyManagerPlatform.instance.getSystemProxyEnable();
+    /*Object? serverObject =
         getRegistryValue(HKEY_CURRENT_USER, regSubKey, ProxyServer);
     Object? enableObject =
         getRegistryValue(HKEY_CURRENT_USER, regSubKey, ProxyEnable);
@@ -374,7 +377,7 @@ class ProxyManager {
     }
     String server = serverObject as String;
     int enable = enableObject as int;
-    return server == proxy && (enable == 1);
+    return server == proxy && (enable == 1);*/
   }
 
   Future<bool> _getSystemProxyEnableLinux(List<ProxyOption> options) async {
